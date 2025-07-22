@@ -1,6 +1,7 @@
 // Estado da Aplicação
 let currentUser = null;
 let chartInstances = {};
+let allNestsReportData = []; // Armazena todos os dados dos ninhos para filtragem
 
 // Seletores do DOM
 const sel = (selector) => document.querySelector(selector);
@@ -12,6 +13,23 @@ document.addEventListener('DOMContentLoaded', () => {
     checkAuthStatus();
     setupEventListeners();
 });
+// --- FUNÇÃO AUXILIAR PARA O INDICADOR DE RISCO (NOVA) ---
+function getRiskIndicatorHTML(risk) {
+    let riskClass = '';
+    switch (risk) {
+        case 'crítico':
+            riskClass = 'risk-critical';
+            break;
+        case 'sob observação':
+            riskClass = 'risk-observation';
+            break;
+        case 'estável':
+            riskClass = 'risk-stable';
+            break;
+    }
+    // Retorna o span HTML com a classe de cor correta
+    return `<span class="risk-indicator ${riskClass}"></span>`;
+}
 
 // --- SETUP ---
 function setupEventListeners() {
@@ -19,7 +37,7 @@ function setupEventListeners() {
     sel('#register-form').addEventListener('submit', handleAuth);
     sel('#logout-btn').addEventListener('click', handleLogout);
     
-    // Adicionado listener para o link "Esqueci minha senha"
+    // Listener para o link "Esqueci minha senha"
     sel('#auth-section').addEventListener('click', (e) => {
         if (e.target.matches('#forgot-password-link')) {
             handleForgotPassword(e);
@@ -35,25 +53,31 @@ function setupEventListeners() {
             infoBox.style.display = infoBox.style.display === 'none' ? 'block' : 'none';
         }
         if (e.target.matches('#export-ninhos-btn')) {
-            window.location.href = '/api/relatorios/ninhos';
+            window.location.href = '/api/relatorios/ninhos/export';
         }
+    });
+
+    // Adiciona listeners para os filtros de relatório
+    sel('#dashboard').addEventListener('input', (e) => {
+        if (e.target.matches('#filter-regiao')) applyReportFilters();
+    });
+    sel('#dashboard').addEventListener('change', (e) => {
+        if (e.target.matches('#filter-status') || e.target.matches('#filter-risco')) applyReportFilters();
     });
 }
 
-// --- CONTROLE DE UI (LÓGICA CORRIGIDA) ---
+// --- CONTROLE DE UI ---
 function switchTab(tabName) {
-    // 1. Atualiza o estilo dos botões das abas
     dashboard.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
-
-    // 2. Esconde TODOS os conteúdos das abas
     dashboard.querySelectorAll('.tab-content').forEach(c => {
+        c.classList.remove('active');
         c.style.display = 'none';
     });
-
-    // 3. Mostra APENAS o conteúdo da aba ativa e carrega seus dados
+    
     const activeTabContent = sel(`#tab-${tabName}`);
     if (activeTabContent) {
-        activeTabContent.style.display = 'block'; // Controle direto da visibilidade
+        activeTabContent.classList.add('active');
+        activeTabContent.style.display = 'block';
         loadTabContent(tabName);
     }
 }
@@ -63,9 +87,9 @@ function loadTabContent(tabName) {
         'estatisticas': loadStatisticsAndCharts,
         'cadastrar': renderNinhoForm,
         'listar': loadNinhos,
-        'ranking': () => loadRanking('geral'), // Ao clicar na tab, sempre carrega o ranking geral primeiro
+        'ranking': () => loadRanking('geral'),
         'admin': loadAdminPanel,
-        'relatorios': () => {} // A aba de relatórios é estática
+        'relatorios': loadReportDataAndRenderTable
     };
     if (loaders[tabName]) loaders[tabName]();
 }
@@ -77,11 +101,8 @@ function showUI(isLoggedIn) {
         userNameSpan.textContent = currentUser.nome_completo;
         const isAdmin = currentUser.is_admin;
         adminTab.style.display = isAdmin ? 'block' : 'none';
-        const reportsTab = sel('#reports-tab'); // Verifica se a aba de relatórios existe
-        if (reportsTab) {
-            reportsTab.style.display = isAdmin ? 'block' : 'none';
-        }
-        switchTab('estatisticas'); // Inicia na aba de estatísticas por padrão
+        sel('#reports-tab').style.display = isAdmin ? 'block' : 'none';
+        switchTab('estatisticas');
     }
 }
 
@@ -136,7 +157,7 @@ async function handleLogout() {
     try {
         await apiCall('/auth/logout', { method: 'POST' });
         currentUser = null;
-        showUI(false);
+        window.location.reload();
     } catch (error) {
         showAlert(error.message, 'error');
     }
@@ -173,8 +194,8 @@ function renderNinhoForm() {
                 <div class="form-row"><div class="form-group"><label for="ninho-dias">Dias para Eclosão:</label><input type="number" id="ninho-dias" name="dias_para_eclosao" min="0" required></div><div class="form-group"><label for="ninho-predadores">Predadores:</label><select id="ninho-predadores" name="predadores"><option value="false">Não</option><option value="true">Sim</option></select></div></div>
                 <div class="form-row"><div class="form-group"><label for="ninho-latitude">Latitude:</label><input type="number" id="ninho-latitude" name="latitude" step="any"></div><div class="form-group"><label for="ninho-longitude">Longitude:</label><input type="number" id="ninho-longitude" name="longitude" step="any"></div></div>
                 <div class="form-group"><label for="ninho-foto">Foto:</label><input type="file" id="ninho-foto" name="foto" accept="image/*"></div>
-                <button type="button" id="get-location-btn" class="btn" style="margin-bottom: 15px; background-color: #17a2b8;">📍 Obter Localização Atual</button>
-                <button type="submit" class="btn">Cadastrar Ninho</button>
+                <button type="button" id="get-location-btn" class="btn" style="width: 100%; margin-bottom: 15px; background-color: #17a2b8;">📍 Obter Localização Atual</button>
+                <button type="submit" class="btn" style="width: 100%;">Cadastrar Ninho</button>
             </form>
         </div>`;
     sel('#ninho-form').addEventListener('submit', handleCreateNinho);
@@ -215,11 +236,29 @@ async function loadNinhos() {
             listEl.innerHTML = '<p>Você ainda não cadastrou nenhum ninho.</p>';
             return;
         }
-        listEl.innerHTML = data.ninhos.map(n => `<div class="ranking-item"><div class="info" style="flex-grow:3;"><div class="nome">${n.regiao} (${n.quantidade_ovos} ovos)</div><div class="username">Status: ${n.status} | Risco: ${n.risco}</div></div>${n.foto_path ? `<img src="/uploads/${n.foto_path.split('/')[1]}" style="width:60px;height:60px;border-radius:8px;">` : ''}</div>`).join('');
+        listEl.innerHTML = data.ninhos.map(n => {
+            // CORREÇÃO: Capitaliza a primeira letra para melhor visualização
+            const statusCapitalized = n.status.charAt(0).toUpperCase() + n.status.slice(1);
+            const riscoCapitalized = n.risco.charAt(0).toUpperCase() + n.risco.slice(1);
+            
+            return `
+            <div class="ranking-item">
+                <div class="info" style="flex-grow:3;">
+                    <div class="nome">${n.regiao} (${n.quantidade_ovos} ovos)</div>
+                    <div class="username" style="font-size: 0.8em; color: #666;">
+                        Status: ${statusCapitalized} | 
+                        Risco: ${getRiskIndicatorHTML(n.risco)} ${riscoCapitalized} | 
+                        Registrado em: ${new Date(n.data_registro).toLocaleDateString('pt-BR')}
+                    </div>
+                </div>
+                ${n.foto_path ? `<img src="/uploads/${n.foto_path.split('/')[1]}" style="width:60px;height:60px;border-radius:8px;">` : ''}
+            </div>
+        `}).join('');
     } catch (error) {
         listEl.innerHTML = `<p style="color:red;">${error.message}</p>`;
     }
 }
+
 
 function getCurrentLocation() {
     if (!navigator.geolocation) return showAlert('Geolocalização não é suportada neste navegador.', 'error');
@@ -247,9 +286,12 @@ function getCurrentLocation() {
 
 // --- ESTATÍSTICAS E GRÁFICOS ---
 async function loadStatisticsAndCharts() {
+    const gridEl = sel('#stats-grid');
+    if (!gridEl) return;
+    gridEl.innerHTML = '';
     try {
         const [stats, rankingStats] = await Promise.all([apiCall('/estatisticas'), apiCall('/ranking/estatisticas')]);
-        sel('#stats-grid').innerHTML = `<div class="stat-card"><h4>${stats.total_ninhos||0}</h4><p>Ninhos Totais</p></div><div class="stat-card"><h4>${stats.ninhos_prestes_eclodir||0}</h4><p>Perto da Eclosão</p></div><div class="stat-card"><h4>${stats.ninhos_por_risco.crítico||0}</h4><p>Ninhos Críticos</p></div><div class="stat-card"><h4>${stats.media_ovos_critico||0}</h4><p>Média Ovos/Crítico</p></div>`;
+        gridEl.innerHTML = `<div class="stat-card"><h4>${stats.total_ninhos||0}</h4><p>Ninhos Totais</p></div><div class="stat-card"><h4>${stats.ninhos_prestes_eclodir||0}</h4><p>Perto da Eclosão</p></div><div class="stat-card"><h4>${stats.ninhos_por_risco.crítico||0}</h4><p>Ninhos Críticos</p></div><div class="stat-card"><h4>${stats.media_ovos_critico||0}</h4><p>Média Ovos/Crítico</p></div>`;
         renderChart('statusChart', { type: 'pie', data: stats.ninhos_por_status, title: 'Ninhos por Status', colors: ['#28a745', '#ffc107', '#dc3545'] });
         renderChart('riscoChart', { type: 'doughnut', data: stats.ninhos_por_risco, title: 'Ninhos por Risco', colors: ['#17a2b8', '#fd7e14', '#e83e8c'] });
         renderChart('regioesChart', { type: 'bar', data: Object.fromEntries(rankingStats.regioes_top.map(i => [i.regiao, i.total_ninhos])), title: 'Top Regiões', yAxis: true, colors: ['rgba(0,123,255,0.7)'] });
@@ -260,7 +302,8 @@ async function loadStatisticsAndCharts() {
 
 function renderChart(canvasId, { type, data, title, colors, yAxis = false }) {
     if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
-    const ctx = sel(`#${canvasId}`).getContext('2d');
+    const ctx = sel(`#${canvasId}`)?.getContext('2d');
+    if (!ctx) return;
     chartInstances[canvasId] = new Chart(ctx, {
         type, data: { labels: Object.keys(data), datasets: [{ data: Object.values(data), backgroundColor: colors }] },
         options: {
@@ -290,6 +333,77 @@ async function loadRanking(periodo) {
     } catch (error) {
         listEl.innerHTML = `<p style="color:red;">${error.message}</p>`;
     }
+}
+
+// --- RELATÓRIOS ---
+async function loadReportDataAndRenderTable() {
+    const container = sel('#report-table-container');
+    container.innerHTML = '<p>Carregando todos os registros...</p>';
+    try {
+        allNestsReportData = await apiCall('/relatorios/ninhos/data');
+        sel('#filter-regiao').value = '';
+        sel('#filter-status').value = '';
+        sel('#filter-risco').value = '';
+        applyReportFilters();
+    } catch (error) {
+        container.innerHTML = `<p style="color:red;">${error.message}</p>`;
+    }
+}
+
+function applyReportFilters() {
+    const regiaoFilter = sel('#filter-regiao').value.toLowerCase();
+    const statusFilter = sel('#filter-status').value;
+    const riscoFilter = sel('#filter-risco').value;
+
+    const filteredData = allNestsReportData.filter(ninho => {
+        const matchRegiao = ninho.regiao.toLowerCase().includes(regiaoFilter);
+        const matchStatus = !statusFilter || ninho.status === statusFilter;
+        const matchRisco = !riscoFilter || ninho.risco === riscoFilter;
+        return matchRegiao && matchStatus && matchRisco;
+    });
+
+    renderReportTable(filteredData);
+}
+function renderReportTable(data) {
+    const container = sel('#report-table-container');
+    const countEl = sel('#report-results-count');
+    countEl.textContent = `${data.length} resultado(s) encontrado(s).`;
+
+    if (data.length === 0) {
+        container.innerHTML = '<p>Nenhum registro encontrado com os filtros aplicados.</p>';
+        return;
+    }
+
+    container.innerHTML = `
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Região</th>
+                    <th>Ovos</th>
+                    <th>Status</th>
+                    <th>Risco</th>
+                    <th>Data</th>
+                    <th>Voluntário</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${data.map(n => {
+                    // CORREÇÃO: Capitaliza a primeira letra para melhor visualização
+                    const riscoCapitalized = n.risco.charAt(0).toUpperCase() + n.risco.slice(1);
+                    return `
+                    <tr>
+                        <td>${n.regiao}</td>
+                        <td>${n.quantidade_ovos}</td>
+                        <td>${n.status}</td>
+                        <!-- MUDANÇA AQUI: Adiciona a bolinha na tabela de relatórios -->
+                        <td>${getRiskIndicatorHTML(n.risco)} ${riscoCapitalized}</td>
+                        <td>${new Date(n.data_registro).toLocaleDateString('pt-BR')}</td>
+                        <td>${n.usuario_nome}</td>
+                    </tr>
+                `}).join('')}
+            </tbody>
+        </table>
+    `;
 }
 
 // --- ADMIN ---
