@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <style>
-        :root { --primary-color: #4CAF50; --dark-primary: #45a049; --gold: #FFD700; --silver: #C0C0C0; --bronze: #CD7F32; }
+        :root { --primary-color: #4CAF50; --dark-primary: #073609; --gold: #FFD700; --silver: #C0C0C0; --bronze: #CD7F32; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
         .container { background: white; border-radius: 15px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); overflow: hidden; width: 100%; max-width: 1200px; }
@@ -87,6 +87,25 @@
         .risk-observation { background-color: #fd7e14; } /* Laranja */
         .risk-stable { background-color: #28a745; } /* Verde */
         @media (max-width: 768px) { .form-row, .charts-grid { grid-template-columns: 1fr; } }
+        /* NOVO ESTILO para o checkbox de termos */
+        .terms-group {
+            display: flex;
+            align-items: center;
+            font-size: 0.9em;
+            color: #555;
+            margin-bottom: 20px;
+        }
+        .terms-group input {
+            width: auto;
+            margin-right: 10px;
+        }
+        .terms-group a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        .terms-group a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -96,7 +115,13 @@
             <div id="auth-section" class="auth-section">
                 <div class="auth-form"><h3>Login</h3><form id="login-form"><div class="form-group"><label>Usuário:</label><input type="text" name="username" required></div><div class="form-group"><label>Senha:</label><input type="password" name="password" required></div><button type="submit" class="btn" style="width:100%;">Entrar</button></form><div style="text-align:center; margin-top:15px;"><a href="#" id="forgot-password-link" style="color: #555; font-size: 0.9em;">Esqueci minha senha</a></div></div>
                
-                <div class="auth-form"><h3>Cadastro</h3><form id="register-form"><div class="form-group"><label>Nome Completo:</label><input type="text" name="nome_completo" required></div><div class="form-group"><label>Usuário:</label><input type="text" name="username" required></div><div class="form-group"><label>Email:</label><input type="email" name="email" required></div><div class="form-group"><label>Senha:</label><input type="password" name="password" required></div><button type="submit" class="btn" style="width:100%;">Cadastrar</button></form></div>
+                <div class="auth-form"><h3>Cadastro</h3><form id="register-form"><div class="form-group"><label>Nome Completo:</label><input type="text" name="nome_completo" required></div><div class="form-group"><label>Usuário:</label><input type="text" name="username" required></div><div class="form-group"><label>Email:</label><input type="email" name="email" required></div><div class="form-group"><label>Senha:</label><input type="password" name="password" required>
+                 <!-- CHECKBOX DE TERMOS ADICIONADO -->
+                        <div class="terms-group">
+                            <input type="checkbox" id="register-terms" required>
+                            <label for="register-terms">Eu li e concordo com os <a href="/termos-de-uso.html" target="_blank">Termos de Uso</a>.</label>
+                        </div>
+                        </div><button type="submit" class="btn" style="width:100%;">Cadastrar</button></form></div>
             </div>
 
             <div id="dashboard" class="dashboard">

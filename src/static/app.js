@@ -36,6 +36,14 @@ function setupEventListeners() {
     sel('#login-form').addEventListener('submit', handleAuth);
     sel('#register-form').addEventListener('submit', handleAuth);
     sel('#logout-btn').addEventListener('click', handleLogout);
+
+    // NOVO LISTENER para o checkbox de termos
+    const registerTermsCheckbox = sel('#register-terms');
+    if (registerTermsCheckbox) {
+        registerTermsCheckbox.addEventListener('change', () => {
+            sel('#register-btn').disabled = !registerTermsCheckbox.checked;
+        });
+    }
     
     // Listener para o link "Esqueci minha senha"
     sel('#auth-section').addEventListener('click', (e) => {
