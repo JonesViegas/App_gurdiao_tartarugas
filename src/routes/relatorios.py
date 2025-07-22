@@ -3,11 +3,15 @@ from flask import Blueprint, Response, jsonify
 from src.models.ninho import Ninho
 from src.routes.auth import admin_required
 from openpyxl import Workbook # Importa a biblioteca para criar Excel
+from src.routes.auth import login_required 
+from collections import defaultdict
+
 
 relatorios_bp = Blueprint('relatorios', __name__)
 
 @relatorios_bp.route('/relatorios/ninhos/data', methods=['GET'])
-@admin_required
+@login_required 
+#@admin_required
 def get_ninhos_data():
     """Retorna uma lista completa de todos os ninhos para a tabela de relatórios."""
     try:

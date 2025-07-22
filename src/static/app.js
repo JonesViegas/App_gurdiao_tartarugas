@@ -100,8 +100,13 @@ function showUI(isLoggedIn) {
     if (isLoggedIn) {
         userNameSpan.textContent = currentUser.nome_completo;
         const isAdmin = currentUser.is_admin;
+        
+        // Lógica de visibilidade das abas
         adminTab.style.display = isAdmin ? 'block' : 'none';
-        sel('#reports-tab').style.display = isAdmin ? 'block' : 'none';
+        
+        // CORREÇÃO: Mostra a aba de relatórios para TODOS os usuários logados
+        sel('#reports-tab').style.display = 'block'; 
+        
         switchTab('estatisticas');
     }
 }

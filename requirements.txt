@@ -11,3 +11,4 @@ python-dotenv
 # Servidor de Produção
 gunicorn
 openpyxl
+psycopg2-binary
