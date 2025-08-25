@@ -1,0 +1,79 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Redefinir Senha</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .reset-container { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        h3 { margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; text-align: left; }
+        input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; }
+        .btn { width: 100%; padding: 12px; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        .message { margin-top: 20px; padding: 10px; border-radius: 5px; }
+        .message.success { background: #d4edda; color: #155724; }
+        .message.error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="reset-container">
+        <h3>Redefinir sua Senha</h3>
+        <form id="reset-form">
+            <div class="form-group">
+                <label for="password">Nova Senha:</label>
+                <input type="password" id="password" required>
+            </div>
+            <div class="form-group">
+                <label for="confirm-password">Confirme a Nova Senha:</label>
+                <input type="password" id="confirm-password" required>
+            </div>
+            <button type="submit" class="btn">Salvar Nova Senha</button>
+        </form>
+        <div id="message-box" class="message" style="display:none;"></div>
+    </div>
+
+    <script>
+        document.getElementById('reset-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            const messageBox = document.getElementById('message-box');
+
+            if (password !== confirmPassword) {
+                messageBox.textContent = 'As senhas não coincidem.';
+                messageBox.className = 'message error';
+                messageBox.style.display = 'block';
+                return;
+            }
+
+            const token = new URLSearchParams(window.location.search).get('token');
+            if (!token) {
+                messageBox.textContent = 'Token de redefinição não encontrado.';
+                messageBox.className = 'message error';
+                messageBox.style.display = 'block';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/reset-password', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ token, password })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    messageBox.textContent = data.message + ' Você pode fechar esta página e fazer login.';
+                    messageBox.className = 'message success';
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                messageBox.textContent = 'Erro: ' + error.message;
+                messageBox.className = 'message error';
+            }
+            messageBox.style.display = 'block';
+        });
+    </script>
+</body>
+</html>
