@@ -431,8 +431,17 @@ async function loadAdminPanel() {
                     <div>${u.nome_completo} <span style="font-size:0.8em; color: ${u.is_admin ? 'var(--primary-color)' : '#777'}">${u.is_admin ? '(Admin)' : ''}</span></div>
                     <div class="username"><a href="mailto:${u.email}" style="color:#007bff;text-decoration:none;">${u.email}</a></div>
                 </div>
-                <div class="pontos"><button class="btn" style="font-size:12px;padding:8px;background-color:${u.ativo ? '#6c757d':'#28a745'}" ${currentUser.id === u.id ? 'disabled':''} onclick="toggleUser(${u.id},'ativo',${!u.ativo})">${u.ativo?'Desativar':'Ativar'}</button></div>
-                <div class="pontos"><button class="btn" style="font-size:12px;padding:8px;background-color:${u.is_admin ? '#dc3545':'#007bff'}" ${currentUser.id === u.id ? 'disabled':''} onclick="toggleUser(${u.id},'is_admin',${!u.is_admin})">${u.is_admin?'Revogar Admin':'Tornar Admin'}</button></div>
+                <div class="admin-actions">
+                    <button class="btn btn-sm ${u.ativo ? 'btn-secondary' : 'btn-success'}" ${currentUser.id === u.id ? 'disabled' : ''} onclick="toggleUser(${u.id}, 'ativo', ${!u.ativo})">
+                        ${u.ativo ? 'Desativar' : 'Ativar'}
+                    </button>
+                    <button class="btn btn-sm ${u.is_admin ? 'btn-danger' : 'btn-primary'}" ${currentUser.id === u.id ? 'disabled' : ''} onclick="toggleUser(${u.id}, 'is_admin', ${!u.is_admin})">
+                        ${u.is_admin ? 'Revogar Admin' : 'Tornar Admin'}
+                    </button>
+                    <button class="btn btn-sm btn-danger" ${currentUser.id === u.id ? 'disabled' : ''} onclick="deleteUser(${u.id})">
+                        Excluir
+                    </button>
+                </div>
             </div>`).join('');
     } catch (error) {
         listEl.innerHTML = `<p style="color:red;">${error.message}</p>`;
@@ -440,10 +449,28 @@ async function loadAdminPanel() {
 }
 
 async function toggleUser(userId, field, value) {
-    if (!confirm(`Tem certeza que deseja alterar '${field}'?`)) return;
+    const actionText = field === 'is_admin' ? (value ? 'promover' : 'rebaixar') : (value ? 'ativar' : 'desativar');
+    if (!confirm(`Tem certeza que deseja ${actionText} este usuário?`)) return;
+    
     try {
-        await apiCall(`/admin/users/${userId}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({[field]: value}) });
+        await apiCall(`/admin/users/${userId}`, { 
+            method: 'PUT', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({[field]: value}) 
+        });
         showAlert('Usuário atualizado!', 'success');
+        loadAdminPanel();
+    } catch (error) {
+        showAlert(error.message, 'error');
+    }
+}
+
+async function deleteUser(userId) {
+    if (!confirm('Atenção! Esta ação é irreversível. Deseja realmente excluir este usuário e todos os seus dados?')) return;
+
+    try {
+        await apiCall(`/admin/users/${userId}`, { method: 'DELETE' });
+        showAlert('Usuário excluído com sucesso!', 'success');
         loadAdminPanel();
     } catch (error) {
         showAlert(error.message, 'error');
